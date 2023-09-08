@@ -1,0 +1,38 @@
+pools:
+  - id: Simple Scenario
+    gun:
+      type: http/scenario
+      target: localhost:8092
+      ssl: false
+      dial:
+        timeout: 1s
+      response-header-timeout: 1s
+      answlog:
+        enabled: true
+        path: out/answ.log
+        filter: all
+      auto-tag:
+        enabled: true
+        uri-elements: 2
+      httptrace:
+        dump: true
+        trace: true
+    ammo:
+      type: http/scenario
+      file: scenario-ammo.hcl
+    result:
+      type: phout
+      destination: out/phout.log
+    rps:
+      - {duration: 2s, type: const, ops: 2}
+    startup:
+      - {type: once, times: 1}
+log:
+  level: debug
+monitoring:
+  cpuprofile:
+    enabled: true
+    file: out/cpu.prof
+  memprofile:
+    enabled: true
+    file: out/mem.prof
