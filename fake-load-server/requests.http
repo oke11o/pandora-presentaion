@@ -1,0 +1,53 @@
+### auth method for server
+# @name Auth
+POST {{service}}/auth
+Content-Type: application/json
+
+{
+    "user_id": 8
+}
+
+> {%
+    client.global.set("token", response.body.auth_key)
+%}
+
+### list method for server
+# @name List
+GET {{service}}/list?asdf=asfd
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+> {%
+    client.global.set("items", response.body.items)
+%}
+
+### item method for server
+# @name Item
+< {%
+    request.variables.set("item", client.global.get("items").first)
+%}
+POST {{service}}/order
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+    "item_id": 8099
+}
+
+
+### statistic method for server
+# @name Statistic
+GET {{service}}/statistic
+Content-Type: application/json
+
+
+### statistic method for server
+# @name Statistic
+GET http://4bs65mu2kdulxmir.myt.yp-c.yandex.net
+Content-Type: application/json
+
+
+### reset method for server
+# @name Reset
+POST {{service}}/reset
+Content-Type: application/json

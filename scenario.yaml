@@ -24,9 +24,9 @@ pools:
       type: phout
       destination: out/phout.log
     rps:
-      - {duration: 2s, type: const, ops: 2}
+      - {duration: 3s, type: const, ops: 10}
     startup:
-      - {type: once, times: 1}
+      - {type: once, times: 10}
 log:
   level: debug
 monitoring:
