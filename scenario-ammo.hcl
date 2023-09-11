@@ -118,6 +118,6 @@ scenario "scenario1" {
     "sleep(100)",
     "order_req(1)",
     "sleep(100)",
-    "order_req2(1)"
+    "order_req2(2)"
   ]
 }
