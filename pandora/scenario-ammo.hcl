@@ -1,12 +1,12 @@
 
 variable_source "users" "file/csv" {
-  file              = "users.csv"
+  file              = "../users.csv"
   fields            = ["user_id", "name", "pass"]
   ignore_first_line = true
   delimiter         = ","
 }
 variable_source "filter_src" "file/json" {
-  file = "filter.json"
+  file = "../filter.json"
 }
 request "auth_req" {
   method = "POST"
@@ -108,7 +108,7 @@ EOF
   }
 }
 
-scenario "scenario1" {
+scenario "scenario_name" {
   weight           = 50
   min_waiting_time = 10
   shoot = [
@@ -116,8 +116,6 @@ scenario "scenario1" {
     "sleep(100)",
     "list_req(1)",
     "sleep(100)",
-    "order_req(1)",
-    "sleep(100)",
-    "order_req2(2)"
+    "order_req(3)"
   ]
 }
