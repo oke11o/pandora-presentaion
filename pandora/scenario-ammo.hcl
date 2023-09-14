@@ -1,19 +1,19 @@
 
 variable_source "users" "file/csv" {
-  file              = "../users.csv"
+  file              = "users.csv"
   fields            = ["user_id", "name", "pass"]
   ignore_first_line = true
   delimiter         = ","
 }
 variable_source "filter_src" "file/json" {
-  file = "../filter.json"
+  file = "filter.json"
 }
 request "auth_req" {
   method = "POST"
   uri    = "/auth"
   headers = {
     Content-Type = "application/json"
-    Useragent    = "Tank"
+    Useragent    = "Yandex"
   }
   tag       = "auth"
   body      = <<EOF
@@ -56,7 +56,7 @@ request "list_req" {
   headers = {
     Authorization = "Bearer {{.request.auth_req.postprocessor.token}}"
     Content-Type  = "application/json"
-    Useragent     = "Tank"
+    Useragent     = "Yandex"
   }
   tag = "list"
   uri = "/list"
@@ -74,7 +74,7 @@ request "order_req" {
   headers = {
     Authorization = "Bearer {{.request.auth_req.postprocessor.token}}"
     Content-Type  = "application/json"
-    Useragent     = "Tank"
+    Useragent     = "Yandex"
   }
   tag  = "order_req"
   body = <<EOF
@@ -94,7 +94,7 @@ request "order_req2" {
   headers = {
     Authorization = "Bearer {{.request.auth_req.postprocessor.token}}"
     Content-Type  = "application/json"
-    Useragent     = "Tank"
+    Useragent     = "Yandex"
   }
   tag  = "order_req"
   body = <<EOF
@@ -111,7 +111,7 @@ EOF
 scenario "scenario_name" {
   weight           = 50
   min_waiting_time = 10
-  shoot = [
+  requests         = [
     "auth_req(1)",
     "sleep(100)",
     "list_req(1)",
