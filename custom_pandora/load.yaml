@@ -1,0 +1,24 @@
+pools:
+  - id: Just-pool-name
+    gun:
+      type: custom_http_gun
+      target: localhost:8092
+      sleep: 100ms
+    ammo:
+      type: users/json
+      source:
+        type: file
+        path: ./ammo.json
+    result:
+      type: phout
+      destination: phout.log
+    startup:
+      duration: 10s
+      type: const
+      ops: 1
+    rps:
+      - type: const
+        ops: 1
+        duration: 2s
+log:
+  level: debug

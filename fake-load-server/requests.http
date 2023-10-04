@@ -8,7 +8,7 @@ Content-Type: application/json
 }
 
 > {%
-    client.global.set("token", response.body.auth_key)
+    client.global.set("auth_key", response.body.auth_key)
 %}
 
 ### list method for server
