@@ -1,24 +1,23 @@
 pools:
   - id: Just-pool-name
     gun:
-      type: custom_http_gun
+      type: custom_generator
       target: localhost:8092
       sleep: 100ms
+      reqSleep: 100ms
     ammo:
-      type: users/json
+      type: custom_users
       source:
         type: file
-        path: ./ammo.json
+        path: ./users.json
     result:
       type: phout
       destination: phout.log
     startup:
-      duration: 10s
-      type: const
-      ops: 1
+      type: once
+      times: 100
     rps:
-      - type: const
-        ops: 1
-        duration: 2s
+      - type: unlimited
+        duration: 5s
 log:
-  level: debug
+  level: info

@@ -19,7 +19,7 @@ pools:
         trace: true
     ammo:
       type: http/scenario
-      file: payload-6.hcl
+      file: payload-1.hcl
     result:
       type: phout
       destination: out/phout.log

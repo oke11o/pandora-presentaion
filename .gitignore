@@ -1,2 +1,7 @@
+.idea/
+.DS_Store
 pandora/pandora
+custom_pandora/custom_pandora
+custom_pandora/pandora
 phout.log
+jmeter.log

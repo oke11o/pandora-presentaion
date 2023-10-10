@@ -189,7 +189,11 @@ func listHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	_, _ = w.Write([]byte(fmt.Sprintf(`{"items": [%s]}`, strings.Join(result, ","))))
+	var first string
+	if len(result) > 0 {
+		first = result[0]
+	}
+	_, _ = w.Write([]byte(fmt.Sprintf(`{"first_item":%s,"items": [%s]}`, first, strings.Join(result, ","))))
 }
 
 func orderHandler(w http.ResponseWriter, r *http.Request) {

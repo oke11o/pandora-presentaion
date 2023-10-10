@@ -4,40 +4,65 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/yandex/pandora/core"
-	"github.com/yandex/pandora/core/aggregator/netsample"
-	"go.uber.org/zap"
 	"math/rand"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/spf13/afero"
+	"github.com/yandex/pandora/core"
+	"github.com/yandex/pandora/core/aggregator/netsample"
+	coreimport "github.com/yandex/pandora/core/import"
+	"github.com/yandex/pandora/core/register"
+	"go.uber.org/zap"
 )
 
-type GunConfig struct {
+func Import(fs afero.Fs) {
+	coreimport.RegisterCustomJSONProvider("custom_provider",
+		func() core.Ammo {
+			return &Payload{}
+		},
+	)
+	register.Gun("custom_generator", func(conf GeneratorConfig) core.Gun {
+		return &Generator{
+			conf: conf,
+		}
+	}, defaultConfig)
+}
+
+type Payload struct {
+	UserID   int64  `json:"user_id"`
+	Name     string `json:"name"`
+	Password string `json:"password"`
+}
+
+type GeneratorConfig struct {
 	Target    string `validate:"required"`
 	Transport TransportConfig
-	Sleep     *time.Duration
+	Sleep     time.Duration
+	ReqSleep  time.Duration
 }
 type TransportConfig struct {
 	IdleConnTimeout time.Duration
 }
 
-func defaultGunConfig() GunConfig {
-	return GunConfig{
+func defaultConfig() GeneratorConfig {
+	return GeneratorConfig{
 		Transport: TransportConfig{
 			IdleConnTimeout: 1,
 		},
+		ReqSleep: 100 * time.Millisecond,
 	}
 }
 
-type Gun struct {
-	conf   GunConfig
+type Generator struct {
+	conf   GeneratorConfig
 	aggr   netsample.Aggregator
 	deps   core.GunDeps
 	client http.Client
 }
 
-func (g *Gun) Bind(aggr core.Aggregator, deps core.GunDeps) error {
+func (g *Generator) Bind(aggr core.Aggregator, deps core.GunDeps) error {
 	g.aggr = netsample.UnwrapAggregator(aggr)
 	g.deps = deps
 	tr := &http.Transport{
@@ -47,48 +72,43 @@ func (g *Gun) Bind(aggr core.Aggregator, deps core.GunDeps) error {
 	return nil
 }
 
-func (g *Gun) Shoot(ammo core.Ammo) {
-	a, ok := ammo.(*Ammo)
+func (g *Generator) Shoot(payload core.Ammo) {
+	a, ok := payload.(*Payload)
 	if !ok {
-		g.deps.Log.Error("unexpected ammo type", zap.Any("ammo", ammo))
+		g.deps.Log.Error("unexpected payload type", zap.Any("payload", payload))
 		return
 	}
-	sleep := func() {}
-	if g.conf.Sleep != nil {
-		sleep = func() {
-			time.Sleep(*g.conf.Sleep)
-		}
-	}
-
-	g.shoot(a, sleep)
+	g.shoot(a)
 }
 
-func (g *Gun) shoot(ammo *Ammo, sleep func()) {
+func (g *Generator) shoot(payload *Payload) {
 	ctx := context.Background()
-	authToken, err := g.auth(ctx, ammo.UserID)
+	authToken, err := g.auth(ctx, payload.UserID)
 	if err != nil {
 		g.deps.Log.Error("cant get auth token", zap.Error(err))
+		return
 	}
-	sleep()
+	time.Sleep(g.conf.Sleep)
 
-	itemIDs, err := g.list(ctx, ammo.UserID, authToken)
+	itemIDs, err := g.list(ctx, payload.UserID, authToken)
 	if err != nil {
 		g.deps.Log.Error("cant get item list", zap.Error(err))
+		return
 	}
-	sleep()
+	time.Sleep(g.conf.Sleep)
 
 	for i := 0; i < 3; i++ {
 		itemID := itemIDs[rand.Intn(len(itemIDs))]
-		err := g.order(ctx, itemID, ammo.UserID, authToken)
+		err := g.order(ctx, itemID, payload.UserID, authToken)
 		if err != nil {
 			g.deps.Log.Error("cant get item list", zap.Error(err))
 			return
 		}
-		sleep()
+		time.Sleep(g.conf.Sleep)
 	}
 }
 
-func (g *Gun) auth(ctx context.Context, userID int64) (token string, err error) {
+func (g *Generator) auth(ctx context.Context, userID int64) (token string, err error) {
 	sample := netsample.Acquire("auth")
 	sampleCode := 0
 	defer func() {
@@ -96,7 +116,7 @@ func (g *Gun) auth(ctx context.Context, userID int64) (token string, err error) 
 		g.aggr.Report(sample)
 	}()
 
-	addr := fmt.Sprintf("http://%s/auth", g.conf.Target)
+	addr := fmt.Sprintf("http://%s/auth?sleep=%d", g.conf.Target, g.conf.Sleep.Milliseconds())
 	body := strings.NewReader(fmt.Sprintf(`{"user_id": %d}`, userID))
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, addr, body)
 	if err != nil {
@@ -106,8 +126,8 @@ func (g *Gun) auth(ctx context.Context, userID int64) (token string, err error) 
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := g.client.Do(req)
+	sampleCode = resp.StatusCode
 	if err != nil {
-		sampleCode = resp.StatusCode
 		return "", fmt.Errorf("failed to do request: %w", err)
 	}
 	defer resp.Body.Close()
@@ -124,7 +144,7 @@ func (g *Gun) auth(ctx context.Context, userID int64) (token string, err error) 
 	return result.AuthKey, nil
 }
 
-func (g *Gun) list(ctx context.Context, id int64, token string) ([]int64, error) {
+func (g *Generator) list(ctx context.Context, id int64, token string) ([]int64, error) {
 	sample := netsample.Acquire("list")
 	sampleCode := 0
 	defer func() {
@@ -132,7 +152,7 @@ func (g *Gun) list(ctx context.Context, id int64, token string) ([]int64, error)
 		g.aggr.Report(sample)
 	}()
 
-	addr := fmt.Sprintf("http://%s/list", g.conf.Target)
+	addr := fmt.Sprintf("http://%s/list?sleep=%d", g.conf.Target, g.conf.Sleep.Milliseconds())
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, addr, nil)
 	if err != nil {
 		sampleCode = http.StatusBadRequest
@@ -142,8 +162,8 @@ func (g *Gun) list(ctx context.Context, id int64, token string) ([]int64, error)
 	req.Header.Set("Authorization", "Bearer "+token)
 
 	resp, err := g.client.Do(req)
+	sampleCode = resp.StatusCode
 	if err != nil {
-		sampleCode = resp.StatusCode
 		return nil, fmt.Errorf("failed to do request: %w", err)
 	}
 	defer resp.Body.Close()
@@ -160,15 +180,15 @@ func (g *Gun) list(ctx context.Context, id int64, token string) ([]int64, error)
 	return result.ItemIDs, nil
 }
 
-func (g *Gun) order(ctx context.Context, itemID int64, userID int64, token string) error {
-	sample := netsample.Acquire("auth")
+func (g *Generator) order(ctx context.Context, itemID int64, userID int64, token string) error {
+	sample := netsample.Acquire("order")
 	sampleCode := 0
 	defer func() {
 		sample.SetProtoCode(sampleCode)
 		g.aggr.Report(sample)
 	}()
 
-	addr := fmt.Sprintf("http://%s/order", g.conf.Target)
+	addr := fmt.Sprintf("http://%s/order?sleep=%d", g.conf.Target, g.conf.Sleep.Milliseconds())
 	body := strings.NewReader(fmt.Sprintf(`{"user_id": %d, "item_id": %d}`, userID, itemID))
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, addr, body)
 	if err != nil {
@@ -179,8 +199,8 @@ func (g *Gun) order(ctx context.Context, itemID int64, userID int64, token strin
 	req.Header.Set("Authorization", "Bearer "+token)
 
 	resp, err := g.client.Do(req)
+	sampleCode = resp.StatusCode
 	if err != nil {
-		sampleCode = resp.StatusCode
 		return fmt.Errorf("failed to do request: %w", err)
 	}
 	defer resp.Body.Close()
@@ -197,4 +217,4 @@ func (g *Gun) order(ctx context.Context, itemID int64, userID int64, token strin
 	return nil
 }
 
-var _ core.Gun = new(Gun)
+var _ core.Gun = new(Generator)
